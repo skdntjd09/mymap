@@ -606,8 +606,7 @@
 
 <script>
     // 카카오 JavaScript 앱 키
-    const KAKAO_APP_KEY =
-        "d5ae3969bdd447520e67f6b8d7e4f91f";
+    const KAKAO_APP_KEY = "d5ae3969bdd447520e67f6b8d7e4f91f";
 
     // 기본 위치: 서울시청
     const DEFAULT_POSITION = {
@@ -615,7 +614,6 @@
         longitude: 126.9786567
     };
 
-    // 일반 검색 탭의 설정
     const SEARCH_CONFIG = {
         hospital: {
             title: "대학병원 검색 결과",
@@ -627,21 +625,16 @@
         }
     };
 
-    // 지도 및 검색에 사용할 변수
     let map = null;
     let placesService = null;
     let geocoder = null;
     let infoWindow = null;
 
-    // 현재 위치와 지역 위치 마커
     let currentPosition = null;
     let currentMarker = null;
     let regionMarker = null;
 
-    // 장소 검색 마커 목록
     let placeMarkers = [];
-
-    // 화면과 검색 상태
     let activeTab = "hospital";
     let currentRegion = "";
     let latestSearchId = 0;
@@ -652,8 +645,7 @@
 
     const regionForm = document.getElementById("regionForm");
     const regionInput = document.getElementById("regionInput");
-    const clearRegionButton =
-        document.getElementById("clearRegionButton");
+    const clearRegionButton = document.getElementById("clearRegionButton");
 
     const searchForm = document.getElementById("searchForm");
     const searchInput = document.getElementById("searchInput");
@@ -662,38 +654,26 @@
     const marketTab = document.getElementById("marketTab");
     const analysisTab = document.getElementById("analysisTab");
 
-    const locationStatus =
-        document.getElementById("locationStatus");
+    const locationStatus = document.getElementById("locationStatus");
+    const resultsTitle = document.getElementById("resultsTitle");
+    const resultCount = document.getElementById("resultCount");
+    const resultsList = document.getElementById("resultsList");
 
-    const resultsTitle =
-        document.getElementById("resultsTitle");
-
-    const resultCount =
-        document.getElementById("resultCount");
-
-    const resultsList =
-        document.getElementById("resultsList");
-
-
-    // 지도 오류나 로딩 메시지 표시
+    // 지도 안내 메시지 표시
     function showMapMessage(message) {
         mapMessage.textContent = message;
         mapMessage.hidden = false;
     }
 
-
     // 결과 목록에 안내 문구 표시
     function showListMessage(message) {
         const paragraph = document.createElement("p");
-
         paragraph.className = "empty-message";
         paragraph.textContent = message;
-
         resultsList.replaceChildren(paragraph);
     }
 
-
-    // 팝업에 넣을 문자열의 특수문자 처리
+    // 팝업 문자열의 특수문자 처리
     function escapeHtml(value) {
         const entities = {
             "&": "&amp;",
@@ -703,21 +683,18 @@
             "'": "&#39;"
         };
 
-        return String(value).replace(/[&<>"']/g, function (character) {
-            return entities[character];
-        });
+        return String(value).replace(/[&<>"']/g, character => entities[character]);
     }
 
-
-    // 카카오 지도 SDK를 불러오기
+    // Kakao 지도 SDK를 비동기로 불러오고 초기화 완료 후 지도 생성
     function loadKakaoSdk() {
-        let isSdkReady = false;
+        let sdkReady = false;
 
-        const timeoutId = window.setTimeout(function () {
-            if (!isSdkReady) {
+        const timeoutId = setTimeout(() => {
+            if (!sdkReady) {
                 showMapMessage(
-                    "지도 로딩이 지연되고 있습니다. " +
-                    "인터넷 연결, JavaScript 키, 웹 도메인 설정을 확인해 주세요."
+                    "SDK 로딩이 20초 이상 걸립니다. " +
+                    "브라우저 콘솔(F12)의 오류를 확인해 주세요."
                 );
             }
         }, 20000);
@@ -731,16 +708,20 @@
 
         sdkScript.async = true;
 
-        // SDK 파일 로딩에 실패한 경우
         sdkScript.onerror = function () {
             clearTimeout(timeoutId);
 
             showMapMessage(
-                "지도 SDK를 불러오지 못했습니다. 카카오 설정을 확인해 주세요."
+                "카카오 지도 SDK 파일을 불러오지 못했습니다. " +
+                "네트워크와 JavaScript 키 설정을 확인해 주세요."
+            );
+
+            console.error(
+                "Kakao Maps SDK script download failed:",
+                sdkScript.src
             );
         };
 
-        // SDK 파일 로드 후 지도 API 초기화를 기다림
         sdkScript.onload = function () {
             if (
                 !window.kakao ||
@@ -750,15 +731,16 @@
                 clearTimeout(timeoutId);
 
                 showMapMessage(
-                    "지도 API 초기화에 실패했습니다."
+                    "SDK 파일은 내려받았지만 지도 API를 초기화할 수 없습니다. " +
+                    "콘솔 오류를 확인해 주세요."
                 );
 
+                console.error("Kakao Maps API object is missing.");
                 return;
             }
 
-            // 지도 API가 완전히 준비된 다음 지도 생성
             kakao.maps.load(function () {
-                isSdkReady = true;
+                sdkReady = true;
                 clearTimeout(timeoutId);
                 initializeMap();
             });
@@ -766,7 +748,6 @@
 
         document.head.appendChild(sdkScript);
     }
-
 
     // 지도와 장소 검색 서비스 초기화
     function initializeMap() {
@@ -781,7 +762,6 @@
                 level: 5
             });
 
-            // 장소 검색과 주소 검색 서비스
             placesService = new kakao.maps.services.Places(map);
             geocoder = new kakao.maps.services.Geocoder();
 
@@ -789,7 +769,7 @@
                 zIndex: 3
             });
 
-            // 지도가 실제로 표시되면 로딩 메시지 숨김
+            // 지도 타일 로딩 완료 시 안내창 숨김
             kakao.maps.event.addListener(
                 map,
                 "tilesloaded",
@@ -798,28 +778,33 @@
                 }
             );
 
-            // 현재 위치를 표시하되, 검색 결과는 전국에서 검색
-            requestCurrentLocation();
+            // 타일 이벤트가 전달되지 않아도 화면을 가린 안내창은 잠시 후 숨김
+            setTimeout(function () {
+                mapMessage.hidden = true;
+            }, 4000);
 
-            // 페이지를 열면 대학병원 전국 키워드 검색
+            locationStatus.textContent =
+                "현재 위치를 확인하고 있습니다. " +
+                "검색은 위치 반경으로 제한하지 않습니다.";
+
+            requestCurrentLocation();
             searchActiveTab();
 
         } catch (error) {
             showMapMessage(
-                "지도 초기화 중 오류가 발생했습니다. 브라우저 콘솔을 확인해 주세요."
+                "지도 초기화 중 오류가 발생했습니다. " +
+                "브라우저 콘솔(F12)을 확인해 주세요."
             );
 
             console.error("지도 초기화 오류:", error);
         }
     }
 
-
-    // 현재 위치 권한 요청
+    // 현재 위치 권한 요청. 권한이 없어도 검색 기능은 사용할 수 있음
     function requestCurrentLocation() {
         if (!navigator.geolocation) {
             locationStatus.textContent =
-                "현재 위치는 사용할 수 없지만 전국 검색은 가능합니다.";
-
+                "현재 위치 기능은 사용할 수 없습니다. 전국 검색은 가능합니다.";
             return;
         }
 
@@ -830,7 +815,6 @@
                     position.coords.longitude
                 );
 
-                // 현재 위치 마커 표시
                 if (currentMarker) {
                     currentMarker.setMap(null);
                 }
@@ -841,27 +825,973 @@
                     title: "현재 위치"
                 });
 
-                // 아직 검색 결과가 없다면 현재 위치로 지도 이동
-                if (
-                    placeMarkers.length === 0 &&
-                    !currentRegion &&
-                    activeTab !== "analysis"
-                ) {
+                if (!currentRegion && activeTab !== "analysis") {
                     map.setCenter(currentPosition);
                     map.setLevel(5);
                 }
 
-                locationStatus.textContent =
-                    currentRegion
-                        ? currentRegion + " 분석 중 · 지역 키워드 검색"
-                        : "현재 위치 표시 · 검색은 전국 키워드 기준";
+                locationStatus.textContent = currentRegion
+                    ? currentRegion + " 지역 분석 중"
+                    : "현재 위치 표시 · 검색은 전국 키워드 기준";
             },
-
             function () {
                 locationStatus.textContent =
                     "현재 위치 권한을 사용할 수 없습니다. " +
-                    "그래도 전국 검색과 지역 분석은 가능합니다.";
+                    "전국 검색과 지역 분석은 가능합니다.";
             },
-
             {
-                enable
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 60000
+            }
+        );
+    }
+
+    // 행정구역 표현을 비교하기 쉽게 정리
+    function normalizeRegionText(value) {
+        return String(value)
+            .replace(/서울특별시|서울시/g, "서울")
+            .replace(/부산광역시|부산시/g, "부산")
+            .replace(/대구광역시|대구시/g, "대구")
+            .replace(/인천광역시|인천시/g, "인천")
+            .replace(/광주광역시|광주시/g, "광주")
+            .replace(/대전광역시|대전시/g, "대전")
+            .replace(/울산광역시|울산시/g, "울산")
+            .replace(/세종특별자치시|세종시/g, "세종")
+            .replace(/경기도/g, "경기")
+            .replace(/강원특별자치도|강원도/g, "강원")
+            .replace(/충청북도/g, "충북")
+            .replace(/충청남도/g, "충남")
+            .replace(/전북특별자치도|전라북도/g, "전북")
+            .replace(/전라남도/g, "전남")
+            .replace(/경상북도/g, "경북")
+            .replace(/경상남도/g, "경남")
+            .replace(/제주특별자치도/g, "제주")
+            .replace(/\s+/g, "")
+            .replace(/[^가-힣a-zA-Z0-9]/g, "");
+    }
+
+    // 결과 중 중복 장소 제거
+    function uniquePlaces(places) {
+        const uniqueMap = new Map();
+
+        places.forEach(place => {
+            if (!place.x || !place.y) return;
+
+            const key = place.id
+                ? String(place.id)
+                : [place.place_name, place.x, place.y].join("|");
+
+            if (!uniqueMap.has(key)) {
+                uniqueMap.set(key, place);
+            }
+        });
+
+        return Array.from(uniqueMap.values());
+    }
+
+    // 입력한 지역명과 주소가 맞는 결과를 우선 선택
+    function filterPlacesForRegion(places, region) {
+        const unique = uniquePlaces(places);
+
+        if (!region) return unique;
+
+        const terms = region
+            .split(/\s+/)
+            .map(normalizeRegionText)
+            .filter(Boolean);
+
+        const matches = unique.filter(place => {
+            const address = normalizeRegionText(
+                (place.address_name || "") +
+                (place.road_address_name || "")
+            );
+
+            return terms.every(term => address.includes(term));
+        });
+
+        if (matches.length) return matches;
+
+        const lastTerm = terms[terms.length - 1];
+
+        const partial = unique.filter(place => {
+            const address = normalizeRegionText(
+                (place.address_name || "") +
+                (place.road_address_name || "")
+            );
+
+            return address.includes(lastTerm);
+        });
+
+        // 주소가 완전히 일치하지 않더라도 지역명을 포함한 키워드 검색 결과를 참고 결과로 사용
+        return partial.length ? partial : unique;
+    }
+
+    // 주소를 좌표로 바꾸어 지역 중심 위치 찾기
+    function findRegionCenter(region) {
+        return new Promise(resolve => {
+            geocoder.addressSearch(region, function (data, status) {
+                if (
+                    status === kakao.maps.services.Status.OK &&
+                    data.length
+                ) {
+                    resolve({
+                        position: new kakao.maps.LatLng(
+                            Number(data[0].y),
+                            Number(data[0].x)
+                        ),
+                        found: true
+                    });
+                    return;
+                }
+
+                placesService.keywordSearch(
+                    region + " 주민센터",
+                    function (places, placeStatus) {
+                        if (
+                            placeStatus ===
+                                kakao.maps.services.Status.OK &&
+                            places.length
+                        ) {
+                            resolve({
+                                position: new kakao.maps.LatLng(
+                                    Number(places[0].y),
+                                    Number(places[0].x)
+                                ),
+                                found: true
+                            });
+                        } else {
+                            resolve({
+                                position: null,
+                                found: false
+                            });
+                        }
+                    }
+                );
+            });
+        });
+    }
+
+    // 입력한 행정구역 이름에 따라 지도 확대 수준 설정
+    function getRegionMapLevel(region) {
+        const parts = region.trim().split(/\s+/);
+        const lastPart = parts[parts.length - 1];
+
+        if (/(동|읍|면|리)$/.test(lastPart)) return 5;
+        if (/(구|군)$/.test(lastPart)) return 7;
+        if (/시$/.test(lastPart)) return 8;
+
+        return 7;
+    }
+
+    // 지도에 지역 중심 마커 표시
+    function setRegionMarker(position, region) {
+        if (regionMarker) {
+            regionMarker.setMap(null);
+        }
+
+        regionMarker = new kakao.maps.Marker({
+            map: map,
+            position: position,
+            title: region + " 기준 위치"
+        });
+
+        kakao.maps.event.addListener(
+            regionMarker,
+            "click",
+            function () {
+                infoWindow.setContent(
+                    '<div style="padding:8px 10px;font-size:12px">' +
+                    escapeHtml(region) +
+                    '<br>지역 기준 위치</div>'
+                );
+
+                infoWindow.open(map, regionMarker);
+            }
+        );
+    }
+
+    // 검색 결과 마커 정리
+    function clearPlaceMarkers() {
+        placeMarkers.forEach(marker => marker.setMap(null));
+        placeMarkers = [];
+
+        if (infoWindow) {
+            infoWindow.close();
+        }
+    }
+
+    // 결과 영역 초기화
+    function clearSearchResults() {
+        latestSearchId++;
+        clearPlaceMarkers();
+
+        resultCount.textContent = "0곳";
+        resultsList.replaceChildren();
+    }
+
+    // 선택된 탭 버튼 강조
+    function updateTabButtons() {
+        const tabMap = {
+            hospital: hospitalTab,
+            market: marketTab,
+            analysis: analysisTab
+        };
+
+        Object.keys(tabMap).forEach(name => {
+            const selected = activeTab === name;
+
+            tabMap[name].classList.toggle("active", selected);
+            tabMap[name].setAttribute("aria-pressed", String(selected));
+        });
+    }
+
+    // 장소 정보 팝업 표시
+    function showPlaceInfo(place, marker) {
+        const name = escapeHtml(
+            place.place_name || "이름 정보 없음"
+        );
+
+        const address = escapeHtml(
+            place.road_address_name ||
+            place.address_name ||
+            "주소 정보 없음"
+        );
+
+        infoWindow.setContent(
+            '<div style="padding:10px 12px;min-width:160px;' +
+            'max-width:260px;font-size:12px;line-height:1.7">' +
+            '<strong style="display:block;margin-bottom:4px">' +
+            name +
+            '</strong><span style="color:#666">' +
+            address +
+            '</span></div>'
+        );
+
+        infoWindow.open(map, marker);
+    }
+
+    // 검색 결과 목록 카드 생성
+    function createPlaceCard(place, marker) {
+        const card = document.createElement("article");
+        card.className = "place-card";
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "place-main";
+
+        const name = document.createElement("strong");
+        name.className = "place-name";
+        name.textContent = place.place_name || "이름 정보 없음";
+
+        const category = document.createElement("span");
+        category.className = "place-category";
+        category.textContent = place.category_name || "장소";
+
+        const address = document.createElement("span");
+        address.className = "place-address";
+        address.textContent =
+            place.road_address_name ||
+            place.address_name ||
+            "주소 정보 없음";
+
+        button.append(name, category, address);
+
+        button.addEventListener("click", function () {
+            map.setCenter(marker.getPosition());
+            map.setLevel(5);
+            showPlaceInfo(place, marker);
+        });
+
+        card.appendChild(button);
+
+        if (place.phone) {
+            const phone = document.createElement("div");
+            phone.className = "place-phone";
+            phone.textContent = place.phone;
+            card.appendChild(phone);
+        }
+
+        if (
+            place.place_url &&
+            /^https?:\/\//i.test(place.place_url)
+        ) {
+            const link = document.createElement("a");
+            link.className = "place-link";
+            link.href = place.place_url;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = "카카오맵에서 보기 ↗";
+            card.appendChild(link);
+        }
+
+        return card;
+    }
+
+    // 지도 마커와 결과 리스트 표시
+    function displayPlaces(places, fitBounds) {
+        clearPlaceMarkers();
+
+        const bounds = new kakao.maps.LatLngBounds();
+
+        places.forEach(place => {
+            const position = new kakao.maps.LatLng(
+                Number(place.y),
+                Number(place.x)
+            );
+
+            const marker = new kakao.maps.Marker({
+                map: map,
+                position: position,
+                title: place.place_name
+            });
+
+            placeMarkers.push(marker);
+            bounds.extend(position);
+
+            kakao.maps.event.addListener(
+                marker,
+                "click",
+                () => showPlaceInfo(place, marker)
+            );
+        });
+
+        if (fitBounds && places.length > 1) {
+            map.setBounds(bounds);
+        } else if (places.length === 1) {
+            map.setCenter(
+                new kakao.maps.LatLng(
+                    Number(places[0].y),
+                    Number(places[0].x)
+                )
+            );
+
+            map.setLevel(5);
+        }
+
+        resultsList.replaceChildren();
+
+        places.forEach((place, index) => {
+            resultsList.appendChild(
+                createPlaceCard(place, placeMarkers[index])
+            );
+        });
+    }
+
+    // 전국 또는 지역 키워드 검색을 페이지별로 수집
+    function collectKeywordPages(keyword, maxPages = 3) {
+        return new Promise((resolve, reject) => {
+            const collected = [];
+            let page = 1;
+
+            function requestPage() {
+                placesService.keywordSearch(
+                    keyword,
+                    function (data, status, pagination) {
+                        if (
+                            status === kakao.maps.services.Status.OK
+                        ) {
+                            collected.push(...data);
+
+                            if (
+                                page < maxPages &&
+                                pagination &&
+                                pagination.hasNextPage
+                            ) {
+                                page++;
+                                requestPage();
+                            } else {
+                                resolve(collected);
+                            }
+
+                        } else if (
+                            status ===
+                            kakao.maps.services.Status.ZERO_RESULT
+                        ) {
+                            resolve(collected);
+
+                        } else if (collected.length) {
+                            resolve(collected);
+
+                        } else {
+                            reject(
+                                new Error(
+                                    "장소 검색 요청 실패: " +
+                                    keyword +
+                                    " (" + status + ")"
+                                )
+                            );
+                        }
+                    },
+                    {
+                        page: page,
+                        size: 15
+                    }
+                );
+            }
+
+            requestPage();
+        });
+    }
+
+    // 현재 탭 검색
+    function searchActiveTab() {
+        if (!placesService || !map) return;
+
+        if (activeTab === "analysis") {
+            runResidentialAnalysis();
+            return;
+        }
+
+        if (!activeTab) return;
+
+        const config = SEARCH_CONFIG[activeTab];
+
+        resultsTitle.textContent = currentRegion
+            ? currentRegion + " · " + config.title
+            : config.title;
+
+        const query = currentRegion
+            ? currentRegion + " " + config.keyword
+            : config.keyword;
+
+        searchPlaces(query);
+    }
+
+    // 탭 전환
+    function selectTab(tabName) {
+        activeTab = tabName;
+
+        updateTabButtons();
+        clearSearchResults();
+
+        searchInput.value = "";
+
+        resultsTitle.textContent = tabName === "analysis"
+            ? (currentRegion
+                ? currentRegion + " 거주지 분석"
+                : "거주지 분석")
+            : (currentRegion
+                ? currentRegion + " · " +
+                  SEARCH_CONFIG[tabName].title
+                : SEARCH_CONFIG[tabName].title);
+
+        searchActiveTab();
+    }
+
+    // 일반 키워드 검색 및 표시
+    async function searchPlaces(keyword) {
+        if (!placesService || !map) return;
+
+        const searchId = ++latestSearchId;
+
+        clearPlaceMarkers();
+
+        resultCount.textContent = "검색 중";
+        showListMessage("장소를 검색하고 있습니다.");
+
+        try {
+            const rawPlaces = await collectKeywordPages(keyword, 3);
+
+            if (searchId !== latestSearchId) return;
+
+            const places = currentRegion
+                ? filterPlacesForRegion(rawPlaces, currentRegion)
+                : uniquePlaces(rawPlaces);
+
+            resultCount.textContent = places.length + "곳";
+
+            if (!places.length) {
+                showListMessage(
+                    "검색 결과가 없습니다. 다른 검색어나 지역을 입력해 보세요."
+                );
+                return;
+            }
+
+            displayPlaces(places, !currentRegion);
+
+            locationStatus.textContent = currentRegion
+                ? currentRegion + " 키워드 검색 · 최대 45개 검색 결과"
+                : "전국 키워드 검색 · 최대 45개 검색 결과";
+
+        } catch (error) {
+            if (searchId !== latestSearchId) return;
+
+            console.error("장소 검색 오류:", error);
+
+            resultCount.textContent = "오류";
+
+            showListMessage(
+                "검색에 실패했습니다. F12 콘솔의 오류 내용을 확인해 주세요."
+            );
+        }
+    }
+
+    // 시설 개수에 따라 점수 계산
+    function calculateCountScore(count, target, points) {
+        return Math.round(Math.min(count / target, 1) * points);
+    }
+
+    // 분석 통계 카드
+    function createMetricCard(title, places) {
+        const card = document.createElement("div");
+        card.className = "metric-card";
+
+        const heading = document.createElement("span");
+        heading.className = "metric-title";
+        heading.textContent = title;
+
+        const value = document.createElement("strong");
+        value.className = "metric-value";
+        value.textContent = places.length + "곳";
+
+        const detail = document.createElement("p");
+        detail.className = "metric-detail";
+
+        detail.textContent = places.length
+            ? "검색 예시: " +
+              places.slice(0, 2).map(place => place.place_name).join(", ")
+            : "검색 결과를 찾지 못했습니다.";
+
+        card.append(heading, value, detail);
+
+        return card;
+    }
+
+    // 분석 화면에서 시설 목록 표시
+    function addAnalysisSection(title, places, markerByPlaceKey) {
+        const heading = document.createElement("h3");
+        heading.className = "analysis-section-title";
+        heading.textContent = title;
+
+        resultsList.appendChild(heading);
+
+        const subtitle = document.createElement("p");
+        subtitle.className = "analysis-section-subtitle";
+        subtitle.textContent = "검색된 장소 예시 · 최대 5개";
+
+        resultsList.appendChild(subtitle);
+
+        if (!places.length) {
+            const empty = document.createElement("p");
+            empty.className = "empty-message";
+            empty.textContent = "검색 결과가 없습니다.";
+            resultsList.appendChild(empty);
+            return;
+        }
+
+        places.slice(0, 5).forEach(place => {
+            const key = place.id
+                ? String(place.id)
+                : [place.place_name, place.x, place.y].join("|");
+
+            const marker = markerByPlaceKey.get(key);
+
+            if (marker) {
+                resultsList.appendChild(
+                    createPlaceCard(place, marker)
+                );
+            }
+        });
+    }
+
+    // 지역의 병원·마트·교통 시설을 검색하여 참고 점수 계산
+    async function runResidentialAnalysis() {
+        if (!placesService || !geocoder || !currentRegion) {
+            showListMessage(
+                "먼저 시·군·구·동을 입력하고 지역 분석을 실행해 주세요."
+            );
+            return;
+        }
+
+        const analysisId = ++latestSearchId;
+
+        clearPlaceMarkers();
+
+        resultsTitle.textContent = currentRegion + " 거주지 분석";
+        resultCount.textContent = "분석 중";
+
+        showListMessage(
+            currentRegion + " 지역의 시설을 검색하고 있습니다."
+        );
+
+        const center = await findRegionCenter(currentRegion);
+
+        if (
+            analysisId !== latestSearchId ||
+            activeTab !== "analysis"
+        ) {
+            return;
+        }
+
+        if (center.found && center.position) {
+            map.setCenter(center.position);
+            map.setLevel(getRegionMapLevel(currentRegion));
+
+            setRegionMarker(center.position, currentRegion);
+        }
+
+        const tasks = [
+            { group: "hospital", keyword: "대학병원" },
+            { group: "hospital", keyword: "종합병원" },
+            { group: "market", keyword: "마트" },
+            { group: "market", keyword: "식료품점" },
+            { group: "transport", keyword: "지하철역" },
+            { group: "transport", keyword: "버스정류장" }
+        ];
+
+        const taskResults = await Promise.all(
+            tasks.map(async task => {
+                try {
+                    const results = await collectKeywordPages(
+                        currentRegion + " " + task.keyword,
+                        3
+                    );
+
+                    return {
+                        group: task.group,
+                        places: filterPlacesForRegion(
+                            results,
+                            currentRegion
+                        ),
+                        failed: false
+                    };
+
+                } catch (error) {
+                    console.error(
+                        "지역 검색 오류:",
+                        task.keyword,
+                        error
+                    );
+
+                    return {
+                        group: task.group,
+                        places: [],
+                        failed: true
+                    };
+                }
+            })
+        );
+
+        if (
+            analysisId !== latestSearchId ||
+            activeTab !== "analysis"
+        ) {
+            return;
+        }
+
+        const groupPlaces = group => uniquePlaces(
+            taskResults
+                .filter(item => item.group === group)
+                .flatMap(item => item.places)
+        );
+
+        const hospitalPlaces = groupPlaces("hospital");
+        const marketPlaces = groupPlaces("market");
+        const transportPlaces = groupPlaces("transport");
+
+        const allPlaces = uniquePlaces([
+            ...hospitalPlaces,
+            ...marketPlaces,
+            ...transportPlaces
+        ]);
+
+        const hospitalScore = calculateCountScore(
+            hospitalPlaces.length,
+            5,
+            35
+        );
+
+        const marketScore = calculateCountScore(
+            marketPlaces.length,
+            10,
+            35
+        );
+
+        const transportScore = calculateCountScore(
+            transportPlaces.length,
+            10,
+            30
+        );
+
+        const totalScore =
+            hospitalScore + marketScore + transportScore;
+
+        const verdict = totalScore >= 85
+            ? "검색된 생활 편의시설이 많은 편이에요."
+            : totalScore >= 70
+                ? "검색된 생활 편의시설이 비교적 양호해요."
+                : totalScore >= 50
+                    ? "다른 생활 편의시설도 확인해 보세요."
+                    : "다른 지역과 비교해 보는 것을 권장해요.";
+
+        resultsList.replaceChildren();
+        resultCount.textContent = allPlaces.length + "곳";
+
+        // 종합 점수 카드 생성
+        const scoreCard = document.createElement("section");
+        scoreCard.className = "score-card";
+
+        const scoreLabel = document.createElement("span");
+        scoreLabel.className = "score-label";
+        scoreLabel.textContent =
+            currentRegion + " 생활 편의 참고 점수";
+
+        const scoreRow = document.createElement("div");
+        scoreRow.className = "score-row";
+
+        const scoreValue = document.createElement("strong");
+        scoreValue.className = "score-value";
+        scoreValue.textContent = totalScore;
+
+        const scoreTotal = document.createElement("span");
+        scoreTotal.className = "score-total";
+        scoreTotal.textContent = "/ 100점";
+
+        scoreRow.append(scoreValue, scoreTotal);
+
+        const verdictText = document.createElement("p");
+        verdictText.className = "score-verdict";
+        verdictText.textContent = verdict;
+
+        const scoreDetail = document.createElement("p");
+        scoreDetail.className = "score-detail";
+        scoreDetail.textContent =
+            "병원 " + hospitalScore + "/35점 · " +
+            "마트 " + marketScore + "/35점 · " +
+            "대중교통 " + transportScore + "/30점";
+
+        scoreCard.append(
+            scoreLabel,
+            scoreRow,
+            verdictText,
+            scoreDetail
+        );
+
+        resultsList.appendChild(scoreCard);
+
+        // 유형별 검색 결과를 통계 카드로 표시
+        const metricGrid = document.createElement("div");
+        metricGrid.className = "metric-grid";
+
+        metricGrid.append(
+            createMetricCard(
+                "대학병원 · 종합병원",
+                hospitalPlaces
+            ),
+            createMetricCard(
+                "마트 · 식료품점",
+                marketPlaces
+            ),
+            createMetricCard(
+                "지하철역 · 버스정류장",
+                transportPlaces
+            ),
+            createMetricCard(
+                "중복 제거한 시설",
+                allPlaces
+            )
+        );
+
+        resultsList.appendChild(metricGrid);
+
+        // 점수 계산 기준과 검색의 한계 안내
+        const note = document.createElement("p");
+        note.className = "analysis-note";
+        note.textContent =
+            "점수는 지역명 키워드 검색 결과 수로 계산한 참고 지표입니다. " +
+            "행정구역 경계 안의 모든 시설을 수집하는 방식은 아니며, " +
+            "시설의 질·인구·면적·도보 시간을 반영하지 않습니다. " +
+            "서로 다른 규모의 지역을 비교할 때는 주의하세요.";
+
+        resultsList.appendChild(note);
+
+        const failedCount = taskResults.filter(
+            item => item.failed
+        ).length;
+
+        if (failedCount) {
+            const errorNote = document.createElement("p");
+            errorNote.className = "analysis-note";
+            errorNote.textContent =
+                failedCount +
+                "개 검색어 요청이 실패했습니다. " +
+                "일부 시설은 점수에 포함되지 않았을 수 있습니다.";
+
+            resultsList.appendChild(errorNote);
+        }
+
+        // 각 시설 종류별 최대 20개 마커 표시
+        const displayPlaces = uniquePlaces([
+            ...hospitalPlaces.slice(0, 20),
+            ...marketPlaces.slice(0, 20),
+            ...transportPlaces.slice(0, 20)
+        ]);
+
+        const markerByPlaceKey = new Map();
+        const bounds = new kakao.maps.LatLngBounds();
+
+        displayPlaces.forEach(place => {
+            const position = new kakao.maps.LatLng(
+                Number(place.y),
+                Number(place.x)
+            );
+
+            const marker = new kakao.maps.Marker({
+                map: map,
+                position: position,
+                title: place.place_name
+            });
+
+            placeMarkers.push(marker);
+
+            const key = place.id
+                ? String(place.id)
+                : [place.place_name, place.x, place.y].join("|");
+
+            markerByPlaceKey.set(key, marker);
+            bounds.extend(position);
+
+            kakao.maps.event.addListener(
+                marker,
+                "click",
+                () => showPlaceInfo(place, marker)
+            );
+        });
+
+        if (displayPlaces.length > 1) {
+            map.setBounds(bounds);
+        } else if (center.position) {
+            map.setCenter(center.position);
+        }
+
+        addAnalysisSection(
+            "대학병원 · 종합병원",
+            hospitalPlaces,
+            markerByPlaceKey
+        );
+
+        addAnalysisSection(
+            "마트 · 식료품점",
+            marketPlaces,
+            markerByPlaceKey
+        );
+
+        addAnalysisSection(
+            "지하철역 · 버스정류장",
+            transportPlaces,
+            markerByPlaceKey
+        );
+
+        locationStatus.textContent =
+            currentRegion + " 지역 분석 완료 · 키워드 검색 결과 기반";
+    }
+
+    // 지역 분석 폼
+    regionForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+
+        const region = regionInput.value.trim();
+
+        if (!region) {
+            showListMessage("분석할 지역명을 입력해 주세요.");
+            regionInput.focus();
+            return;
+        }
+
+        if (!placesService || !geocoder) {
+            showListMessage("지도가 준비된 뒤 다시 시도해 주세요.");
+            return;
+        }
+
+        currentRegion = region;
+        activeTab = "analysis";
+
+        updateTabButtons();
+        searchInput.value = "";
+
+        clearSearchResults();
+
+        resultsTitle.textContent = region + " 거주지 분석";
+        locationStatus.textContent = region + " 지역을 분석하고 있습니다.";
+
+        runResidentialAnalysis();
+    });
+
+    // 지역 조건을 지우고 전국 검색으로 돌아가기
+    clearRegionButton.addEventListener("click", function () {
+        currentRegion = "";
+        activeTab = "hospital";
+
+        regionInput.value = "";
+        searchInput.value = "";
+
+        updateTabButtons();
+
+        if (regionMarker) {
+            regionMarker.setMap(null);
+            regionMarker = null;
+        }
+
+        clearSearchResults();
+
+        resultsTitle.textContent = SEARCH_CONFIG.hospital.title;
+        locationStatus.textContent =
+            "지역 조건 해제 · 전국 키워드 검색";
+
+        searchActiveTab();
+    });
+
+    // 탭 버튼 이벤트
+    hospitalTab.addEventListener(
+        "click",
+        () => selectTab("hospital")
+    );
+
+    marketTab.addEventListener(
+        "click",
+        () => selectTab("market")
+    );
+
+    analysisTab.addEventListener(
+        "click",
+        () => selectTab("analysis")
+    );
+
+    // 직접 키워드 검색
+    searchForm.addEventListener("submit", function (event) {
+        event.preventDefault();
+
+        const keyword = searchInput.value.trim();
+
+        if (!keyword) {
+            showListMessage("검색어를 입력해 주세요.");
+            searchInput.focus();
+            return;
+        }
+
+        if (!placesService) {
+            showListMessage("지도가 준비된 뒤 검색해 주세요.");
+            return;
+        }
+
+        activeTab = null;
+        updateTabButtons();
+
+        resultsTitle.textContent = currentRegion
+            ? currentRegion + " · " + keyword
+            : "전국 검색: " + keyword;
+
+        searchPlaces(
+            currentRegion
+                ? currentRegion + " " + keyword
+                : keyword
+        );
+    });
+
+    // 페이지가 열리면 SDK부터 불러오기
+    loadKakaoSdk();
+
+</script>
+</body>
+</html>
